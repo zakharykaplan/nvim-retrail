@@ -69,37 +69,41 @@ end
 
 function M:set(enabled)
   -- Record the override
-  self.override[vim.fn.bufnr()] = enabled
+  self.override[vim.api.nvim_get_current_buf()] = enabled
   -- Trigger a refresh
   refresh()
 end
 
 function M:toggle()
   -- Record the override
-  self.override[vim.fn.bufnr()] = not self:enabled()
+  self.override[vim.api.nvim_get_current_buf()] = not self:enabled()
   -- Trigger a refresh
   refresh()
 end
 
 function M:enabled()
   -- Check for a buffer override
-  local override = self.override[vim.fn.bufnr()]
+  local override = self.override[vim.api.nvim_get_current_buf()]
   if override ~= nil then
     return override
   end
   -- Check if this filetype is enabled
-  local enabled = self.config.enabled[vim.bo.filetype]
-  if self.config.filetype.strict then
-    -- Strict filetypes: only allow included filetypes
-    return enabled == true
-  else
-    -- Lenient filetypes: only disallow excluded filetypes
-    return enabled ~= false
+  local enabled_filetype = self.config.enabled_buftype[vim.bo.buftype]
+  if enabled_filetype == nil then
+    enabled_filetype = not self.config.filetype.strict
   end
+  -- Check if this buftype is enabled
+  local enabled_buftype = self.config.enabled_filetype[vim.bo.filetype]
+  if enabled_buftype == nil then
+    enabled_buftype = not self.config.buftype.strict
+  end
+  return enabled_filetype and enabled_buftype
 end
 
 function M.ident()
-  return string.format("%d:%d", vim.fn.tabpagenr(), vim.fn.winnr())
+  local win = vim.api.nvim_get_current_win()
+  local tab = vim.api.nvim_win_get_tabpage(win)
+  return string.format("%d:%d", tab, win)
 end
 
 function M:matchadd()
@@ -126,7 +130,7 @@ end
 
 function M:trim()
   -- Save cursor position
-  local _, lnum, col, off, _ = unpack(vim.fn.getcurpos())
+  local cursor_pos = vim.api.nvim_win_get_cursor(0)
   -- Trim trailing whitespace
   if self.config.trim.whitespace then
     vim.cmd [[keeppatterns %s#\s\+$##e]]
@@ -136,7 +140,7 @@ function M:trim()
     vim.cmd [[keeppatterns vg#\_s*\S#d]]
   end
   -- Restore cursor position
-  vim.fn.cursor(lnum, col, off)
+  vim.api.nvim_win_set_cursor(0, cursor_pos)
 end
 
 return M
